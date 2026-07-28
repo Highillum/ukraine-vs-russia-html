@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROCKET - Симулятор Битвы v3.0</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #080810;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+        #gameWrapper {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 0 60px rgba(255, 100, 30, 0.4), 0 0 120px rgba(30, 80, 255, 0.3), 0 0 200px rgba(0,0,0,0.6);
+        }
+        canvas {
+            display: block;
+            background: #2d5a27;
+        }
+        #minimapCanvas {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            border: 2px solid rgba(255,255,255,0.55);
+            border-radius: 10px;
+            box-shadow: 0 0 18px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 5;
+        }
+        #ui {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            max-width: 920px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .team-score {
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            min-width: 160px;
+            text-align: center;
+            backdrop-filter: blur(4px);
+        }
+        .team-ua {
+            background: rgba(0, 70, 160, 0.4);
+            border: 2px solid #0057b7;
+            color: #FFD700;
+            box-shadow: 0 0 22px rgba(0, 87, 183, 0.5);
+        }
+        .team-ru {
+            background: rgba(180, 0, 0, 0.35);
+            border: 2px solid #c00;
+            color: #FFD700;
+            box-shadow: 0 0 22px rgba(200, 0, 0, 0.5);
+        }
+        .score-detail {
+            font-size: 10px;
+            color: #bbb;
+            letter-spacing: 1.5px;
+            margin-top: 3px;
+        }
+        .vs {
+            font-size: 26px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 18px rgba(255,255,255,0.5);
+            letter-spacing: 3px;
+        }
+        button {
+            padding: 10px 18px;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            border: 2px solid rgba(255,255,255,0.7);
+            border-radius: 8px;
+            cursor: pointer;
+            background: rgba(0,0,0,0.65);
+            color: #fff;
+            transition: all 0.2s;
+            font-family: 'Courier New', monospace;
+            backdrop-filter: blur(2px);
+        }
+        button:hover {
+            background: rgba(255,255,255,0.18);
+            box-shadow: 0 0 22px rgba(255,255,255,0.35);
+            transform: scale(1.05);
+            border-color: #fff;
+        }
+        button:active {
+            transform: scale(0.93);
+        }
+        button.active {
+            background: #e04040;
+            border-color: #ff5555;
+            box-shadow: 0 0 28px rgba(255,60,60,0.8);
+            animation: pulse-btn 0.7s infinite;
+        }
+        @keyframes pulse-btn {
+            0%,
+            100% {
+                box-shadow: 0 0 28px rgba(255,60,60,0.8);
+            }
+            50% {
+                box-shadow: 0 0 50px rgba(255,60,60,1), 0 0 80px rgba(255,100,30,0.6);
+            }
+        }
+        #rocketTag {
+            position: fixed;
+            top: 14px;
+            right: 18px;
+            color: #ff3030;
+            font-weight: bold;
+            font-size: 13px;
+            letter-spacing: 7px;
+            text-shadow: 0 0 35px rgba(255,0,0,0.95), 0 0 70px rgba(255,50,0,0.6);
+            animation: pulse 1.8s infinite;
+            pointer-events: none;
+            z-index: 15;
+        }
+        @keyframes pulse {
+            0%,
+            100% {
+                opacity: 0.5;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+        #winner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 40px;
+            font-weight: bold;
+            letter-spacing: 6px;
+            pointer-events: none;
+            z-index: 25;
+            opacity: 0;
+            transition: opacity 0.5s;
+            text-shadow: 0 0 60px currentColor, 0 0 120px currentColor, 0 0 180px rgba(255,255,255,0.4);
+            text-align: center;
+            line-height: 1.3;
+        }
+        #abilities {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .ability-btn {
+            padding: 8px 14px;
+            font-size: 11px;
+            letter-spacing: 1.5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="rocketTag">R O C K E T</div>
+    <div id="winner"></div>
+    <div id="container">
+        <div id="gameWrapper">
+            <canvas id="battleCanvas" width="920" height="560"></canvas>
+            <canvas id="minimapCanvas" width="155" height="155"></canvas>
+        </div>
+        <div id="ui">
+            <div class="team-score team-ua" id="scoreUA">
+                🇺🇦 УКРАИНА: 20
+                <div class="score-detail" id="detailUA"></div>
+            </div>
+            <div class="vs">⚔️</div>
+            <div class="team-score team-ru" id="scoreRU">
+                🇷🇺 РОССИЯ: 20
+                <div class="score-detail" id="detailRU"></div>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+            <button id="restartBtn">🔄 ЗАНОВО</button>
+            <button id="speedBtn">⏩ x1</button>
+            <button id="addUA">+5 🇺🇦</button>
+            <button id="addRU">+5 🇷🇺</button>
+        </div>
+        <div id="abilities">
+            <button class="ability-btn" id="airstrikeUA">💣 Авиаудар 🇺🇦</button>
+            <button class="ability-btn" id="airstrikeRU">💣 Авиаудар 🇷🇺</button>
+            <button class="ability-btn" id="nukeBtn">☢️ ТАКТ. УДАР</button>
+            <button class="ability-btn" id="smokeBtn">🌫️ ДЫМ. ЗАВЕСА</button>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const canvas = document.getElementById('battleCanvas');
+            const ctx = canvas.getContext('2d');
+            const minimapCanvas = document.getElementById('minimapCanvas');
+            const minimapCtx = minimapCanvas.getContext('2d');
+            const winnerDiv = document.getElementById('winner');
+            const scoreUADiv = document.getElementById('scoreUA');
+            const scoreRUDiv = document.getElementById('scoreRU');
+            const detailUADiv = document.getElementById('detailUA');
+            const detailRUDiv = document.getElementById('detailRU');
+            const speedBtn = document.getElementById('speedBtn');
+            const restartBtn = document.getElementById('restartBtn');
+
+            const W = canvas.width;
+            const H = canvas.height;
+            const GROUND_Y = H - 45;
+
+            let soldiers = [];
+            let particles = [];
+            let explosions = [];
+            let craters = [];
+            let coverObjects = [];
+            let smokeClouds = [];
+            let bulletTrails = [];
+            let speedMultiplier = 1;
+            let gameOver = false;
+            let winner = null;
+            let spawnTimerUA = 0;
+            let spawnTimerRU = 0;
+            let totalUA = 0;
+            let totalRU = 0;
+            let aliveUA = 0;
+            let aliveRU = 0;
+            let killsUA = 0;
+            let killsRU = 0;
+            let globalTime = 0;
+
+            const FLAG_UA = { x: 30, y: GROUND_Y - 165, color: '#0057b7', secondary: '#FFD700' };
+            const FLAG_RU = { x: W - 30, y: GROUND_Y - 165, color: '#c00', secondary: '#fff' };
+
+            const CLASS_SOLDIER = 'soldier';
+            const CLASS_SNIPER = 'sniper';
+            const CLASS_HEAVY = 'heavy';
+            const CLASS_MEDIC = 'medic';
+            const CLASS_ROCKET = 'rocket';
+            const CLASS_FLAMER = 'flamer';
+
+            class Soldier {
+                constructor(team, x, y, unitClass = CLASS_SOLDIER) {
+                    this.team = team;
+                    this.x = x;
+                    this.y = y;
+                    this.vx = 0;
+                    this.vy = 0;
+                    this.width = 13;
+                    this.height = 22;
+                    this.unitClass = unitClass;
+                    this.state = 'advance';
+                    this.target = null;
+                    this.stateTimer = 0;
+                    this.stuckTimer = 0;
+                    this.lastX = x;
+                    this.attackCooldown = 0;
+                    this.abilityCooldown = 0;
+                    this.reactionTime = 0.2 + Math.random() * 0.5;
+                    this.aggressiveness = Math.random();
+                    this.morale = 0.5 + Math.random() * 0.5;
+                    this.coverSeeking = Math.random() < 0.4;
+                    this.flanking = Math.random() < 0.35;
+                    this.animTimer = Math.random() * Math.PI * 2;
+                    this.muzzleFlash = 0;
+                    this.hitFlash = 0;
+                    this.deathAnim = 0;
+                    this.helmetType = Math.floor(Math.random() * 3);
+
+                    switch (unitClass) {
+                        case CLASS_SNIPER:
+                            this.maxHp = 55;
+                            this.attackRange = 210 + Math.random() * 90;
+                            this.attackDamage = 38 + Math.random() * 28;
+                            this.speed = 38 + Math.random() * 28;
+                            this.accuracy = 0.82 + Math.random() * 0.18;
+                            this.color = team === 'UA' ? '#2E5C2E' : '#3A3A3A';
+                            this.camoPattern = 'stripes';
+                            break;
+                        case CLASS_HEAVY:
+                            this.maxHp = 280;
+                            this.attackRange = 28 + Math.random() * 14;
+                            this.attackDamage = 7 + Math.random() * 11;
+                            this.speed = 22 + Math.random() * 18;
+                            this.accuracy = 0.45 + Math.random() * 0.3;
+                            this.color = team === 'UA' ? '#1A3A6A' : '#5A1A1A';
+                            this.width = 17;
+                            this.height = 26;
+                            this.camoPattern = 'solid';
+                            break;
+                        case CLASS_MEDIC:
+                            this.maxHp = 75;
+                            this.attackRange = 38;
+                            this.attackDamage = 7 + Math.random() * 7;
+                            this.speed = 68 + Math.random() * 42;
+                            this.accuracy = 0.62;
+                            this.healRange = 85;
+                            this.healAmount = 18;
+                            this.color = team === 'UA' ? '#F8F8F8' : '#EAEAEA';
+                            this.camoPattern = 'cross';
+                            break;
+                        case CLASS_ROCKET:
+                            this.maxHp = 85;
+                            this.attackRange = 160 + Math.random() * 110;
+                            this.attackDamage = 55 + Math.random() * 45;
+                            this.speed = 42 + Math.random() * 24;
+                            this.accuracy = 0.38 + Math.random() * 0.28;
+                            this.color = team === 'UA' ? '#4A4A18' : '#4A1818';
+                            this.splashRadius = 55;
+                            this.camoPattern = 'dark';
+                            break;
+                        case CLASS_FLAMER:
+                            this.maxHp = 100;
+                            this.attackRange = 50 + Math.random() * 20;
+                            this.attackDamage = 18 + Math.random() * 14;
+                            this.speed = 50 + Math.random() * 30;
+                            this.accuracy = 0.7;
+                            this.color = team === 'UA' ? '#3A2010' : '#4A2010';
+                            this.flameRadius = 40;
+                            this.camoPattern = 'orange';
+                            break;
+                        default:
+                            this.maxHp = 100;
+                            this.attackRange = 28 + Math.random() * 22;
+                            this.attackDamage = 11 + Math.random() * 19;
+                            this.speed = 58 + Math.random() * 48;
+                            this.accuracy = 0.62 + Math.random() * 0.33;
+                            this.color = team === 'UA' ?
+                                `hsl(${205+Math.random()*25},72%,${33+Math.random()*18}%)` :
+                                `hsl(${2+Math.random()*12},58%,${28+Math.random()*18}%)`;
+                            this.camoPattern = 'default';
+                    }
+                    this.hp = this.maxHp;
+                }
+
+                update(dt) {
+                    if (this.hp <= 0) { this.deathAnim += dt; if (this.deathAnim > 0.4) return false; return true; }
+                    if (this.attackCooldown > 0) this.attackCooldown -= dt;
+                    if (this.abilityCooldown > 0) this.abilityCooldown -= dt;
+                    if (this.muzzleFlash > 0) this.muzzleFlash -= dt;
+                    if (this.hitFlash > 0) this.hitFlash -= dt;
+                    this.animTimer += dt * 6;
+
+                    this.findTarget();
+                    this.stateTimer -= dt;
+                    if (this.stateTimer <= 0) { this.chooseState();
+                        this.stateTimer = 0.5 + Math.random() * 1.6; }
+
+                    if (this.coverSeeking && this.hp < this.maxHp * 0.45) {
+                        const nc = this.findNearestCover();
+                        if (nc && Math.abs(this.x - nc.x) < 110) this.x += Math.sign(nc.x - this.x) * this.speed * dt * 0.75;
+                    }
+                    switch (this.state) {
+                        case 'advance':
+                            this.advance(dt);
+                            break;
+                        case 'attack':
+                            this.attackTarget(dt);
+                            break;
+                        case 'retreat':
+                            this.retreat(dt);
+                            break;
+                        case 'flank':
+                            this.flank(dt);
+                            break;
+                        case 'defend':
+                            this.defend(dt);
+                            break;
+                    }
+                    if (this.y < GROUND_Y) this.vy += 520 * dt;
+                    else { this.y = GROUND_Y;
+                        this.vy = 0; }
+                    this.y += this.vy * dt;
+                    this.x = Math.max(10, Math.min(W - 10, this.x));
+                    if (Math.abs(this.x - this.lastX) < 1.2 * dt) this.stuckTimer += dt;
+                    else this.stuckTimer = 0;
+                    this.lastX = this.x;
+                    if (this.stuckTimer > 1) { this.jump();
+                        this.stuckTimer = 0; }
+                    if (this.unitClass === CLASS_MEDIC && this.abilityCooldown <= 0) this.healAllies();
+                    return true;
+                }
+
+                findNearestCover() {
+                    let cl = null,
+                        md = Infinity;
+                    for (const c of coverObjects) { const d = Math.abs(this.x - c.x); if (d < md) { md = d;
+                            cl = c; } }
+                    return cl;
+                }
+                healAllies() {
+                    const allies = soldiers.filter(s => s.team === this.team && s.hp > 0 && s.hp < s.maxHp && s !== this);
+                    let cl = null,
+                        md = Infinity;
+                    for (const a of allies) { const d = Math.abs(this.x - a.x); if (d < this.healRange && d < md) { md = d;
+                            cl = a; } }
+                    if (cl) { cl.hp = Math.min(cl.maxHp, cl.hp + this.healAmount);
+                        this.abilityCooldown = 1.8;
+                        spawnHealParticles(cl.x, cl.y); }
+                }
+                findTarget() {
+                    let cl = null,
+                        md = Infinity;
+                    const enemies = soldiers.filter(s => s.team !== this.team && s.hp > 0);
+                    for (const e of enemies) { const d = Math.abs(this.x - e.x); if (d < md && Math.abs(this.y - e.y) < 65) { md =
+                                d;
+                            cl = e; } }
+                    if (cl && md < 380) this.target = cl;
+                    else if (this.aggressiveness > 0.5) { const tf = this.team === 'UA' ? FLAG_RU : FLAG_UA;
+                        this.target = { x: tf.x, y: GROUND_Y, hp: 999, team: 'flag' }; } else this.target = null;
+                }
+                chooseState() {
+                    if (this.hp < 22 && this.morale < 0.4) { this.state = 'retreat'; return; }
+                    if (this.target && this.target.hp > 0 && Math.abs(this.x - (this.target.x || 0)) < this.attackRange *
+                        1.7) { this.state = Math.random() < 0.6 ? 'attack' : 'flank'; return; }
+                    const r = Math.random(); if (r < 0.28) this.state = 'advance';
+                    else if (r < 0.52) this.state = 'flank';
+                    else if (r < 0.78) this.state = 'attack';
+                    else this.state = 'defend';
+                }
+                advance(dt) { const tx = this.team === 'UA' ? FLAG_RU.x : FLAG_UA.x;
+                    this.x += Math.sign(tx - this.x) * this.speed * dt * 0.88; }
+
+                attackTarget(dt) {
+                    if (!this.target || this.target.hp <= 0) { this.state = 'advance'; return; }
+                    const tx = this.target.x || 0;
+                    const dx = tx - this.x;
+                    const dist = Math.abs(dx);
+                    const od = this.attackRange * 0.65;
+                    if (dist > this.attackRange) this.x += Math.sign(dx) * this.speed * dt * 1.02;
+                    else if (dist < od) this.x -= Math.sign(dx) * this.speed * dt * 0.45;
+                    if (dist < this.attackRange && this.attackCooldown <= 0) this.performAttack();
+                }
+                retreat(dt) { const dir = this.team === 'UA' ? -1 : 1;
+                    this.x += dir * this.speed * 1.5 * dt; if (this.hp > this.maxHp * 0.55) this.state = 'advance'; }
+                flank(dt) {
+                    if (!this.target || this.target.hp <= 0) { this.state = 'advance'; return; }
+                    const tx = this.target.x || 0;
+                    const fo = Math.sin(Date.now() * 0.005 + this.x) * 95;
+                    this.x += Math.sign(tx + fo - this.x) * this.speed * dt * 0.72;
+                    if (Math.abs(this.x - tx) < this.attackRange && this.attackCooldown <= 0) this.performAttack();
+                }
+                defend(dt) {
+                    const fx = this.team === 'UA' ? FLAG_UA.x : FLAG_RU.x;
+                    if (Math.abs(fx - this.x) > 65) this.x += Math.sign(fx - this.x) * this.speed * dt * 0.6;
+                    else this.x += Math.sin(Date.now() * 0.004 + this.x) * 22 * dt;
+                    if (this.target && Math.abs(this.x - (this.target.x || 0)) < this.attackRange) this.performAttack();
+                }
+
+                performAttack() {
+                    if (!this.target || this.target.hp <= 0) return;
+                    const dist = Math.abs(this.x - (this.target.x || 0));
+                    const hc = this.accuracy * (1 - dist / (this.attackRange * 1.7));
+                    this.muzzleFlash = 0.08;
+                    this.attackCooldown = this.unitClass === CLASS_SNIPER ? 1.4 + Math.random() : this.unitClass ===
+                        CLASS_ROCKET ? 2.2 + Math.random() * 1.3 : this.unitClass === CLASS_FLAMER ? 0.15 : 0.18 + Math
+                        .random() * 0.45;
+                    const sx = this.x;
+                    const sy = this.y - this.height;
+                    const tx = this.target.x || this.x;
+                    const ty = (this.target.y || GROUND_Y) - (this.target.height || 20);
+                    bulletTrails.push({ sx, sy, tx, ty, life: 0.2, team: this.team, class: this.unitClass });
+                    if (Math.random() < Math.max(0.12, hc)) {
+                        const dmg = this.attackDamage * (0.7 + Math.random() * 0.6);
+                        this.target.hp -= dmg;
+                        this.target.hitFlash = 0.15;
+                        spawnBloodParticles(tx, ty);
+                        if (this.unitClass === CLASS_ROCKET) {
+                            spawnExplosion(tx, ty, this.splashRadius);
+                            for (const s of soldiers) { if (s !== this.target && s.team !== this.team && s.hp > 0) { const sd =
+                                        Math.abs(s.x - tx); if (sd < this.splashRadius) s.hp -= dmg * (1 - sd / this
+                                        .splashRadius) * 0.55; } }
+                        }
+                        if (this.unitClass === CLASS_FLAMER) {
+                            for (const s of soldiers) { if (s !== this.target && s.team !== this.team && s.hp > 0 && Math.abs(
+                                        s.x - tx) < this.flameRadius) s.hp -= dmg * 0.5; }
+                            spawnFireParticles(tx, ty);
+                        }
+                        if (this.target.hp <= 0) { spawnDeathParticles(tx, ty); if (this.team === 'UA') killsUA++;
+                            else killsRU++;
+                            this.target = null; }
+                    } else { spawnDirtParticles(tx + (Math.random() - 0.5) * 45, GROUND_Y); }
+                    this.vx = (this.team === 'UA' ? -22 : 22) * (Math.random() * 0.5 + 0.5);
+                }
+                jump() { if (this.y >= GROUND_Y) this.vy = -200 - Math.random() * 190; }
+
+                draw(ctx) {
+                    const sx = this.x;
+                    const sy = this.y;
+                    const h = this.height;
+                    const w = this.width;
+                    const isUA = this.team === 'UA';
+                    const facingRight = isUA;
+                    const dying = this.deathAnim > 0;
+                    const deathProgress = Math.min(1, this.deathAnim / 0.4);
+
+                    ctx.save();
+                    ctx.translate(sx, sy);
+
+                    // Тень
+                    if (!dying || deathProgress < 0.7) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                        ctx.beginPath();
+                        ctx.ellipse(0, GROUND_Y - sy + 2, w * 0.65, 3.5, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    if (dying) {
+                        ctx.globalAlpha = 1 - deathProgress;
+                        ctx.rotate(deathProgress * (isUA ? -0.4 : 0.4));
+                    }
+
+                    const bodyY = -h;
+                    const bobY = Math.sin(this.animTimer) * 1.8;
+                    const realBodyY = bodyY + bobY;
+                    const legAnim = Math.sin(this.animTimer) * 3.5;
+
+                    // Ноги
+                    const legColor = this.unitClass === CLASS_HEAVY ? '#3a3a3a' : '#2a2a2a';
+                    ctx.fillStyle = legColor;
+                    ctx.fillRect(-w * 0.28, -7, w * 0.22, 8);
+                    ctx.fillRect(w * 0.08, -7, w * 0.22, 8);
+                    // Ботинки
+                    ctx.fillStyle = '#1a1a1a';
+                    ctx.fillRect(-w * 0.32, -1, w * 0.28, 4);
+                    ctx.fillRect(w * 0.04, -1, w * 0.28, 4);
+
+                    // Тело
+                    const bodyGrad = ctx.createLinearGradient(0, realBodyY, 0, realBodyY + h - 8);
+                    const baseColor = this.color;
+                    bodyGrad.addColorStop(0, this.hitFlash > 0 ? '#fff' : baseColor);
+                    bodyGrad.addColorStop(1, shadeColor(baseColor, -38));
+                    ctx.fillStyle = bodyGrad;
+                    const bodyW = w * 0.85;
+                    const bodyH = h - 8;
+                    const bodyX = -bodyW / 2;
+                    const bodyTop = realBodyY + 1;
+                    ctx.fillRect(bodyX, bodyTop, bodyW, bodyH);
+
+                    // Бронежилет
+                    if (this.unitClass === CLASS_HEAVY) {
+                        ctx.fillStyle = '#444';
+                        ctx.fillRect(bodyX - 1, bodyTop + 2, bodyW + 2, bodyH * 0.55);
+                        ctx.fillStyle = '#555';
+                        ctx.fillRect(bodyX + 1, bodyTop + 3, bodyW - 2, 3);
+                    }
+
+                    // Разгрузка/пояс
+                    ctx.fillStyle = '#3a3028';
+                    ctx.fillRect(bodyX - 1, bodyTop + bodyH * 0.55, bodyW + 2, 4);
+                    // Карманы
+                    ctx.fillStyle = '#4a4038';
+                    ctx.fillRect(bodyX + 2, bodyTop + bodyH * 0.4, bodyW * 0.28, bodyH * 0.22);
+                    ctx.fillRect(bodyX + bodyW * 0.5, bodyTop + bodyH * 0.4, bodyW * 0.28, bodyH * 0.22);
+
+                    // Камуфляж
+                    if (this.camoPattern === 'stripes') {
+                        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                        for (let i = 0; i < 5; i++) ctx.fillRect(bodyX + i * bodyW / 4, bodyTop, bodyW / 6, bodyH);
+                    } else if (this.camoPattern === 'dark') {
+                        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                        ctx.fillRect(bodyX, bodyTop + bodyH * 0.4, bodyW, bodyH * 0.35);
+                    }
+
+                    // Руки
+                    const armY = bodyTop + bodyH * 0.15;
+                    ctx.fillStyle = shadeColor(baseColor, -10);
+                    ctx.fillRect(bodyX - w * 0.2, armY, w * 0.18, bodyH * 0.5);
+                    ctx.fillRect(bodyX + bodyW + w * 0.02, armY, w * 0.18, bodyH * 0.5);
+
+                    // Голова
+                    const headY = realBodyY - w * 0.48;
+                    const headR = w * 0.42;
+                    // Шея
+                    ctx.fillStyle = '#D4A574';
+                    ctx.fillRect(-2, realBodyY - 1, 4, 4);
+                    // Лицо
+                    ctx.fillStyle = '#FFD5B8';
+                    ctx.beginPath();
+                    ctx.arc(0, headY, headR, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+
+                    // Глаза
+                    const eyeY = headY - headR * 0.15;
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath();
+                    ctx.arc(-headR * 0.35, eyeY, headR * 0.25, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(headR * 0.35, eyeY, headR * 0.25, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#111';
+                    ctx.beginPath();
+                    ctx.arc(-headR * 0.32, eyeY, headR * 0.12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(headR * 0.38, eyeY, headR * 0.12, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Каска
+                    ctx.fillStyle = isUA ? '#4A6B3A' : '#4A4A4A';
+                    if (this.unitClass === CLASS_HEAVY) ctx.fillStyle = '#3a3a3a';
+                    if (this.unitClass === CLASS_MEDIC) ctx.fillStyle = '#f5f5f5';
+                    ctx.beginPath();
+                    ctx.arc(0, headY - headR * 0.2, headR * 1.15, Math.PI, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                    // Ремешок
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(-headR * 0.8, headY + headR * 0.2);
+                    ctx.lineTo(headR * 0.8, headY + headR * 0.2);
+                    ctx.stroke();
+
+                    // Оружие
+                    const gunX = facingRight ? bodyX + bodyW : bodyX - w * 0.35;
+                    const gunY = armY + bodyH * 0.15;
+                    ctx.fillStyle = '#3a3a3a';
+                    if (this.unitClass === CLASS_SNIPER) {
+                        ctx.fillRect(gunX, gunY - 3, facingRight ? w * 1.1 : -w * 1.1, 3);
+                        ctx.fillRect(gunX + (facingRight ? w * 0.9 : -w * 0.9), gunY - 4, facingRight ? 4 : -4, 5);
+                        ctx.fillStyle = '#222';
+                        ctx.fillRect(gunX + (facingRight ? w * 0.3 : -w * 0.3), gunY - 5, facingRight ? 3 : -3, 7);
+                    } else if (this.unitClass === CLASS_ROCKET) {
+                        ctx.fillStyle = '#5a3a2a';
+                        const rl = w * 0.8;
+                        ctx.fillRect(gunX, gunY - 4, facingRight ? rl : -rl, 7);
+                        ctx.fillStyle = '#8B4513';
+                        ctx.fillRect(gunX + (facingRight ? rl * 0.6 : -rl * 0.6), gunY - 6, facingRight ? 8 : -8, 10);
+                    } else if (this.unitClass === CLASS_FLAMER) {
+                        ctx.fillStyle = '#444';
+                        ctx.fillRect(gunX, gunY - 3, facingRight ? w * 0.7 : -w * 0.7, 5);
+                        ctx.fillStyle = '#c44';
+                        ctx.fillRect(gunX + (facingRight ? w * 0.5 : -w * 0.5), gunY - 5, facingRight ? 7 : -7, 8);
+                    } else {
+                        ctx.fillRect(gunX, gunY, facingRight ? w * 0.7 : -w * 0.7, 3);
+                        ctx.fillStyle = '#2a2a2a';
+                        ctx.fillRect(gunX + (facingRight ? w * 0.4 : -w * 0.4), gunY - 3, facingRight ? 4 : -4, 7);
+                    }
+
+                    // Медицинский крест
+                    if (this.unitClass === CLASS_MEDIC) {
+                        ctx.fillStyle = '#e00';
+                        ctx.fillRect(-4, bodyTop + bodyH * 0.2, 8, 3);
+                        ctx.fillRect(-1.5, bodyTop + bodyH * 0.12, 3, 8);
+                        // Белая повязка
+                        ctx.fillStyle = '#fff';
+                        ctx.fillRect(-5, armY + bodyH * 0.08, 10, 3);
+                    }
+
+                    // Дульная вспышка
+                    if (this.muzzleFlash > 0) {
+                        const flashX = facingRight ? bodyX + bodyW + w * 0.3 : bodyX - w * 0.3;
+                        const flashY = gunY;
+                        const flashGrad = ctx.createRadialGradient(flashX, flashY, 0, flashX, flashY, 10);
+                        flashGrad.addColorStop(0, 'rgba(255,255,200,0.95)');
+                        flashGrad.addColorStop(0.3, 'rgba(255,200,50,0.7)');
+                        flashGrad.addColorStop(1, 'transparent');
+                        ctx.fillStyle = flashGrad;
+                        ctx.beginPath();
+                        ctx.arc(flashX, flashY, 10, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    // Полоса здоровья
+                    const hpBarW = w * 1.5;
+                    const hpBarY = realBodyY - headR * 2.2;
+                    const hpPercent = this.hp / this.maxHp;
+                    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                    ctx.fillRect(-hpBarW / 2 - 1, hpBarY - 1, hpBarW + 2, 5);
+                    ctx.fillStyle = '#400';
+                    ctx.fillRect(-hpBarW / 2, hpBarY, hpBarW, 3);
+                    const hpGrad = ctx.createLinearGradient(-hpBarW / 2, 0, hpBarW / 2, 0);
+                    hpGrad.addColorStop(0, '#f22');
+                    hpGrad.addColorStop(0.5, '#ff0');
+                    hpGrad.addColorStop(1, '#0f0');
+                    ctx.fillStyle = hpGrad;
+                    ctx.fillRect(-hpBarW / 2, hpBarY, hpBarW * hpPercent, 3);
+                    // Рамка
+                    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                    ctx.lineWidth = 0.8;
+                    ctx.strokeRect(-hpBarW / 2, hpBarY, hpBarW, 3);
+
+                    // Иконка класса
+                    const iconY = hpBarY - 9;
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '7px monospace';
+                    ctx.textAlign = 'center';
+                    const icons = { soldier: '🔫', sniper: '🎯', heavy: '🛡️', medic: '💚', rocket: '🚀', flamer: '🔥' };
+                    ctx.fillText(icons[this.unitClass] || '🔫', 0, iconY);
+
+                    ctx.restore();
+
+                    // Огнемётный огонь
+                    if (this.unitClass === CLASS_FLAMER && this.muzzleFlash > 0 && this.target && this.target.hp > 0) {
+                        const tx = this.target.x || sx;
+                        const ty = (this.target.y || GROUND_Y) - (this.target.height || 20);
+                        const flameGrad = ctx.createLinearGradient(sx, sy - h, tx, ty);
+                        flameGrad.addColorStop(0, 'rgba(255,150,20,0.7)');
+                        flameGrad.addColorStop(0.5, 'rgba(255,80,0,0.5)');
+                        flameGrad.addColorStop(1, 'rgba(255,30,0,0.1)');
+                        ctx.strokeStyle = flameGrad;
+                        ctx.lineWidth = 5;
+                        ctx.lineCap = 'round';
+                        ctx.beginPath();
+                        ctx.moveTo(sx, sy - h + 5);
+                        ctx.lineTo(tx, ty);
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            function shadeColor(color, percent) {
+                const num = parseInt(color.replace('#', '').replace(/[^\d]/g, ''), 16) || 0x555555;
+                const amt = Math.round(2.55 * percent);
+                const R = Math.max(0, Math.min(255, (num >> 16) + amt));
+                const G = Math.max(0, Math.min(255, (num >> 8 & 0x00FF00) + amt));
+                const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
+                return `rgb(${R},${G},${B})`;
+            }
+
+            function spawnBloodParticles(x, y) { for (let i = 0; i < 8; i++) particles.push({ x, y: y - 8, vx: (Math.random() -
+                        0.5) * 140, vy: -Math.random() * 170 - 30, life: 0.5 + Math.random() * 0.8, maxLife: 0.8, color: '#c00',
+                    size: 2 + Math.random() * 5 }); }
+
+            function spawnDeathParticles(x, y) { for (let i = 0; i < 20; i++) particles.push({ x, y: y - 8, vx: (Math.random() -
+                        0.5) * 230, vy: -Math.random() * 290 - 50, life: 0.7 + Math.random() * 1, maxLife: 1, color: Math.random() <
+                        0.5 ? '#c00' : '#333', size: 2 + Math.random() * 7 }); }
+
+            function spawnDirtParticles(x, y) { for (let i = 0; i < 6; i++) particles.push({ x, y, vx: (Math.random() - 0.5) *
+                        80, vy: -Math.random() * 100 - 10, life: 0.3 + Math.random() * 0.5, maxLife: 0.6, color: '#8B7355',
+                    size: 1 + Math.random() * 4 }); }
+
+            function spawnHealParticles(x, y) { for (let i = 0; i < 10; i++) particles.push({ x, y: y - 12, vx: (Math.random() -
+                        0.5) * 50, vy: -Math.random() * 110 - 25, life: 0.9, maxLife: 0.9, color: '#4f4', size: 2 + Math.random() *
+                        4 }); }
+
+            function spawnFireParticles(x, y) { for (let i = 0; i < 12; i++) particles.push({ x: x + (Math.random() - 0.5) *
+                        25, y: y + (Math.random() - 0.5) * 15, vx: (Math.random() - 0.5) * 60, vy: -Math.random() * 80 - 20,
+                    life: 0.4 + Math.random() * 0.5, maxLife: 0.6, color: Math.random() < 0.5 ? '#f80' : '#ff0', size: 2 + Math
+                        .random() * 5 }); }
+
+            function spawnExplosion(x, y, radius) {
+                explosions.push({ x, y, radius, life: 0.55, maxLife: 0.55 });
+                for (let i = 0; i < 30; i++) {
+                    const a = Math.random() * Math.PI * 2;
+                    const d = Math.random() * radius;
+                    particles.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.5, vx: Math.cos(a) * (120 + Math.random() *
+                            320), vy: -Math.random() * 270 - 70, life: 0.6 + Math.random() * 0.8, maxLife: 0.9, color: Math
+                            .random() < 0.5 ? '#f80' : '#ff0', size: 3 + Math.random() * 8 });
+                }
+                craters.push({ x, y: GROUND_Y, radius: radius * 0.45, life: 18 });
+                for (let i = coverObjects.length - 1; i >= 0; i--) { if (Math.abs(coverObjects[i].x - x) < radius)
+                        coverObjects.splice(i, 1); }
+            }
+
+            function spawnSmoke(x, y) { smokeClouds.push({ x, y, radius: 30, life: 4, maxLife: 4, alpha: 0.6 }); }
+
+            function spawnSoldier(team) {
+                const x = team === 'UA' ? 20 + Math.random() * 140 : W - 20 - Math.random() * 140;
+                const r = Math.random();
+                let uc = CLASS_SOLDIER;
+                if (r < 0.06) uc = CLASS_SNIPER;
+                else if (r < 0.14) uc = CLASS_HEAVY;
+                else if (r < 0.22) uc = CLASS_MEDIC;
+                else if (r < 0.30) uc = CLASS_ROCKET;
+                else if (r < 0.37) uc = CLASS_FLAMER;
+                soldiers.push(new Soldier(team, x, GROUND_Y, uc));
+                if (team === 'UA') { totalUA++;
+                    aliveUA++; } else { totalRU++;
+                    aliveRU++; }
+            }
+
+            function initCover() {
+                coverObjects = [];
+                for (let i = 0; i < 14; i++) coverObjects.push({ x: 50 + i * 60 + Math.random() * 25, y: GROUND_Y - 16 - Math
+                        .random() * 12, width: 16 + Math.random() * 22, height: 16 + Math.random() * 22, destroyed: false });
+            }
+
+            function resetGame() {
+                soldiers = [];
+                particles = [];
+                explosions = [];
+                craters = [];
+                smokeClouds = [];
+                bulletTrails = [];
+                gameOver = false;
+                winner = null;
+                totalUA = 20;
+                totalRU = 20;
+                aliveUA = 0;
+                aliveRU = 0;
+                killsUA = 0;
+                killsRU = 0;
+                winnerDiv.style.opacity = '0';
+                winnerDiv.textContent = '';
+                initCover();
+                for (let i = 0; i < 20; i++) spawnSoldier('UA');
+                for (let i = 0; i < 20; i++) spawnSoldier('RU');
+                updateScores();
+            }
+
+            function updateScores() {
+                aliveUA = soldiers.filter(s => s.team === 'UA' && s.hp > 0).length;
+                aliveRU = soldiers.filter(s => s.team === 'RU' && s.hp > 0).length;
+                const countClass = (team, cls) => soldiers.filter(s => s.team === team && s.hp > 0 && s.unitClass === cls)
+                    .length;
+                const su = countClass('UA', CLASS_SNIPER),
+                    hu = countClass('UA', CLASS_HEAVY),
+                    mu = countClass('UA', CLASS_MEDIC),
+                    ru = countClass('UA', CLASS_ROCKET),
+                    fu = countClass('UA', CLASS_FLAMER);
+                const sr = countClass('RU', CLASS_SNIPER),
+                    hr = countClass('RU', CLASS_HEAVY),
+                    mr = countClass('RU', CLASS_MEDIC),
+                    rr = countClass('RU', CLASS_ROCKET),
+                    fr = countClass('RU', CLASS_FLAMER);
+                const suTotal = aliveUA - su - hu - mu - ru - fu;
+                const srTotal = aliveRU - sr - hr - mr - rr - fr;
+                scoreUADiv.innerHTML = `🇺🇦 УКРАИНА: ${aliveUA}`;
+                scoreRUDiv.innerHTML = `🇷🇺 РОССИЯ: ${aliveRU}`;
+                detailUADiv.textContent =
+                    `🔫${suTotal} 🎯${su} 🛡️${hu} 💚${mu} 🚀${ru} 🔥${fu}`;
+                detailRUDiv.textContent =
+                    `🔫${srTotal} 🎯${sr} 🛡️${hr} 💚${mr} 🚀${rr} 🔥${fr}`;
+                if (!gameOver && aliveUA === 0 && aliveRU > 0) endGame('RU');
+                else if (!gameOver && aliveRU === 0 && aliveUA > 0) endGame('UA');
+                else if (!gameOver && aliveUA === 0 && aliveRU === 0) endGame('draw');
+            }
+
+            function endGame(winningTeam) {
+                gameOver = true;
+                winner = winningTeam;
+                winnerDiv.style.opacity = '1';
+                if (winningTeam === 'UA') { winnerDiv.textContent = '🏆 ПОБЕДА\nУКРАИНЫ! 🏆';
+                    winnerDiv.style.color = '#FFD700'; } else if (winningTeam === 'RU') { winnerDiv.textContent =
+                        '🏆 ПОБЕДА\nРОССИИ! 🏆';
+                    winnerDiv.style.color = '#FFD700'; } else { winnerDiv.textContent = '💀 НИЧЬЯ\nВСЕ ПАЛИ 💀';
+                    winnerDiv.style.color = '#999'; }
+            }
+
+            function update(dt) {
+                const edt = dt * speedMultiplier;
+                globalTime += edt;
+                for (let i = explosions.length - 1; i >= 0; i--) { explosions[i].life -= edt; if (explosions[i].life <= 0)
+                        explosions.splice(i, 1); }
+                for (let i = craters.length - 1; i >= 0; i--) { craters[i].life -= edt; if (craters[i].life <= 0) craters.splice(
+                        i, 1); }
+                for (let i = smokeClouds.length - 1; i >= 0; i--) { smokeClouds[i].life -= edt;
+                    smokeClouds[i].radius += edt * 25; if (smokeClouds[i].life <= 0) smokeClouds.splice(i, 1); }
+                for (let i = bulletTrails.length - 1; i >= 0; i--) { bulletTrails[i].life -= edt; if (bulletTrails[i].life <= 0)
+                        bulletTrails.splice(i, 1); }
+                if (!gameOver) {
+                    spawnTimerUA += edt;
+                    spawnTimerRU += edt;
+                    const mu = 32;
+                    if (spawnTimerUA > 3 && aliveUA < mu && soldiers.filter(s => s.team === 'UA').length < mu) { spawnSoldier(
+                            'UA');
+                        spawnTimerUA = 0; }
+                    if (spawnTimerRU > 3 && aliveRU < mu && soldiers.filter(s => s.team === 'RU').length < mu) { spawnSoldier(
+                            'RU');
+                        spawnTimerRU = 0; }
+                    for (let i = soldiers.length - 1; i >= 0; i--) { if (!soldiers[i].update(edt)) soldiers.splice(i, 1); }
+                }
+                for (let i = particles.length - 1; i >= 0; i--) { particles[i].life -= edt;
+                    particles[i].x += particles[i].vx * edt;
+                    particles[i].y += particles[i].vy * edt;
+                    particles[i].vy += 230 * edt; if (particles[i].life <= 0) particles.splice(i, 1); }
+                updateScores();
+            }
+
+            function drawBackground() {
+                const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+                skyGrad.addColorStop(0, '#2a4a7a');
+                skyGrad.addColorStop(0.5, '#6aa8c8');
+                skyGrad.addColorStop(1, '#5B8C3E');
+                ctx.fillStyle = skyGrad;
+                ctx.fillRect(0, 0, W, H);
+                // Солнце
+                const sunX = W * 0.78;
+                const sunY = H * 0.15;
+                const sunGrad = ctx.createRadialGradient(sunX, sunY, 15, sunX, sunY, 130);
+                sunGrad.addColorStop(0, 'rgba(255,255,220,0.9)');
+                sunGrad.addColorStop(0.25, 'rgba(255,240,180,0.5)');
+                sunGrad.addColorStop(1, 'transparent');
+                ctx.fillStyle = sunGrad;
+                ctx.fillRect(0, 0, W, H);
+                // Воронки
+                for (const crater of craters) {
+                    const alpha = Math.min(1, crater.life / 6);
+                    ctx.fillStyle = `rgba(35,18,8,${alpha})`;
+                    ctx.beginPath();
+                    ctx.ellipse(crater.x, crater.y, crater.radius, crater.radius * 0.3, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = `rgba(15,8,3,${alpha*0.7})`;
+                    ctx.beginPath();
+                    ctx.ellipse(crater.x, crater.y, crater.radius * 0.65, crater.radius * 0.2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.fillStyle = '#5B8C3E';
+                ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+                ctx.fillStyle = '#4A7A2E';
+                ctx.fillRect(0, GROUND_Y, W, 4);
+                for (let i = 0; i < W; i += 5) {
+                    const h = 3 + Math.sin(i * 0.22 + globalTime * 1.2) * 2.2;
+                    ctx.strokeStyle = '#3D6B24';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(i, GROUND_Y);
+                    ctx.lineTo(i + 1, GROUND_Y - h);
+                    ctx.stroke();
+                }
+                for (const cover of coverObjects) {
+                    ctx.fillStyle = '#6B5B3A';
+                    ctx.fillRect(cover.x - cover.width / 2, cover.y, cover.width, cover.height);
+                    ctx.fillStyle = '#5A4A2E';
+                    ctx.fillRect(cover.x - cover.width / 2, cover.y, cover.width, 4);
+                    ctx.strokeStyle = '#3a2a1a';
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(cover.x - cover.width / 2, cover.y, cover.width, cover.height);
+                    // Текстура
+                    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+                    for (let j = 0; j < 3; j++) ctx.fillRect(cover.x - cover.width / 3 + j * cover.width / 2.5, cover.y + 3,
+                        cover.width / 5, cover.height / 3);
+                }
+                drawFlag(FLAG_UA.x, FLAG_UA.y, FLAG_UA.color, FLAG_UA.secondary, 'UA');
+                drawFlag(FLAG_RU.x, FLAG_RU.y, FLAG_RU.color, FLAG_RU.secondary, 'RU');
+                ctx.fillStyle = '#3D2B1F';
+                ctx.fillRect(15, GROUND_Y - 2, 155, 7);
+                ctx.fillRect(W - 170, GROUND_Y - 2, 155, 7);
+            }
+
+            function drawFlag(x, y, color, secondary, team) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.fillStyle = '#7B6345';
+                ctx.fillRect(-2.5, 0, 5, 165);
+                ctx.fillStyle = '#5a4a30';
+                ctx.fillRect(-2.5, 0, 1.5, 165);
+                if (team === 'UA') {
+                    ctx.fillStyle = '#0057b7';
+                    ctx.fillRect(2, 5, 34, 24);
+                    ctx.fillStyle = '#FFD700';
+                    ctx.fillRect(2, 29, 34, 24);
+                } else {
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(2, 5, 34, 17);
+                    ctx.fillStyle = '#0039A6';
+                    ctx.fillRect(2, 22, 34, 17);
+                    ctx.fillStyle = '#D52B1E';
+                    ctx.fillRect(2, 39, 34, 15);
+                }
+                const wave = Math.sin(globalTime * 3) * 2.8;
+                ctx.globalAlpha = 0.22;
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(2, 5 + wave, 34, 3);
+                ctx.restore();
+            }
+
+            function drawMinimap() {
+                const mw = 155,
+                    mh = 155;
+                minimapCtx.clearRect(0, 0, mw, mh);
+                minimapCtx.fillStyle = 'rgba(0,0,0,0.6)';
+                minimapCtx.fillRect(0, 0, mw, mh);
+                const sx = mw / W,
+                    sy = mh / H;
+                for (const c of coverObjects) { minimapCtx.fillStyle = '#6B5B3A';
+                    minimapCtx.fillRect(c.x * sx - 1, c.y * sy - 1, 3, 3); }
+                for (const s of soldiers) { if (s.hp <= 0) continue;
+                    minimapCtx.fillStyle = s.team === 'UA' ? '#0070e0' : '#e02020';
+                    minimapCtx.fillRect(s.x * sx - 1, s.y * sy - 1, 2.5, 2.5); }
+                minimapCtx.fillStyle = '#FFD700';
+                minimapCtx.fillRect(FLAG_UA.x * sx - 2, FLAG_UA.y * sy - 2, 4, 4);
+                minimapCtx.fillRect(FLAG_RU.x * sx - 2, FLAG_RU.y * sy - 2, 4, 4);
+                for (const sm of smokeClouds) { minimapCtx.fillStyle = 'rgba(200,200,200,0.3)';
+                    minimapCtx.beginPath();
+                    minimapCtx.arc(sm.x * sx, sm.y * sy, sm.radius * sx, 0, Math.PI * 2);
+                    minimapCtx.fill(); }
+                minimapCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+                minimapCtx.lineWidth = 2;
+                minimapCtx.strokeRect(0, 0, mw, mh);
+            }
+
+            function render() {
+                ctx.clearRect(0, 0, W, H);
+                drawBackground();
+                // Дымовые завесы
+                for (const sm of smokeClouds) {
+                    const alpha = (sm.life / sm.maxLife) * sm.alpha;
+                    const grad = ctx.createRadialGradient(sm.x, sm.y, 0, sm.x, sm.y, sm.radius);
+                    grad.addColorStop(0, `rgba(180,180,180,${alpha})`);
+                    grad.addColorStop(0.6, `rgba(150,150,150,${alpha*0.5})`);
+                    grad.addColorStop(1, 'transparent');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(sm.x, sm.y, sm.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                const sorted = [...soldiers].sort((a, b) => a.y - b.y);
+                for (const s of sorted) s.draw(ctx);
+                // Трассеры
+                for (const bt of bulletTrails) {
+                    const alpha = bt.life / 0.2;
+                    ctx.strokeStyle = bt.class === CLASS_ROCKET ?
+                        `rgba(255,150,30,${alpha})` : bt.class === CLASS_FLAMER ? `rgba(255,100,20,${alpha})` :
+                        `rgba(255,255,180,${alpha*0.7})`;
+                    ctx.lineWidth = bt.class === CLASS_ROCKET ? 3 : 1.2;
+                    ctx.setLineDash([6, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(bt.sx, bt.sy);
+                    ctx.lineTo(bt.tx, bt.ty);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                for (const p of particles) {
+                    const alpha = p.life / p.maxLife;
+                    ctx.fillStyle = p.color.replace(')', `,${alpha})`).replace('rgb',
+                        'rgba').replace(/rgba\((\d+),(\d+),(\d+)\)/, 'rgba($1,$2,$3');
+                    ctx.globalAlpha = alpha;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+                for (const exp of explosions) {
+                    const alpha = exp.life / exp.maxLife;
+                    const grad = ctx.createRadialGradient(exp.x, exp.y, 0, exp.x, exp.y, exp.radius);
+                    grad.addColorStop(0, `rgba(255,255,210,${alpha})`);
+                    grad.addColorStop(0.35, `rgba(255,140,20,${alpha*0.65})`);
+                    grad.addColorStop(1, 'transparent');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(exp.x, exp.y, exp.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                const hazeGrad = ctx.createRadialGradient(W / 2, GROUND_Y, 30, W / 2, GROUND_Y, 480);
+                hazeGrad.addColorStop(0, 'transparent');
+                hazeGrad.addColorStop(1, 'rgba(80,60,40,0.1)');
+                ctx.fillStyle = hazeGrad;
+                ctx.fillRect(0, GROUND_Y - 130, W, 180);
+                drawMinimap();
+            }
+
+            function airstrike(team) {
+                const tx = team === 'UA' ? FLAG_RU.x + (Math.random() - 0.5) * 220 : FLAG_UA.x + (Math.random() - 0.5) *
+                    220;
+                for (let i = 0; i < 3; i++) setTimeout(() => { if (!gameOver) { const sx = tx + (Math.random() - 0.5) * 90;
+                        spawnExplosion(sx, GROUND_Y - 25, 60 + Math.random() * 45); for (const s of soldiers) { if (s.team !==
+                                team && s.hp > 0 && Math.abs(s.x - sx) < 85) { s.hp -= 55 + Math.random() * 55; if (s.hp <=
+                                    0) { spawnDeathParticles(s.x, s.y); if (team === 'UA') killsUA++;
+                                else killsRU++; } } } } }, i * 280);
+            }
+
+            function tacticalNuke() {
+                const tx = W / 2 + (Math.random() - 0.5) * 180;
+                spawnExplosion(tx, GROUND_Y - 30, 190);
+                spawnExplosion(tx - 65, GROUND_Y - 18, 125);
+                spawnExplosion(tx + 65, GROUND_Y - 18, 125);
+                for (const s of soldiers) { if (s.hp > 0 && Math.abs(s.x - tx) < 210) { s.hp -= 90 + Math.random() * 110; if (
+                            s.hp <= 0) { spawnDeathParticles(s.x, s.y); if (s.team === 'UA') killsRU++;
+                        else killsUA++; } } }
+                for (let i = coverObjects.length - 1; i >= 0; i--) { if (Math.abs(coverObjects[i].x - tx) < 210) coverObjects
+                        .splice(i, 1); }
+            }
+
+            function smokeScreen() {
+                const midX = W / 2;
+                for (let i = 0; i < 8; i++) spawnSmoke(midX + (Math.random() - 0.5) * 300, GROUND_Y - 20 - Math.random() *
+                    30);
+            }
+
+            let lastTime = performance.now();
+
+            function gameLoop(ts) {
+                const dt = Math.min(0.1, (ts - lastTime) / 1000 || 0.016);
+                lastTime = ts;
+                update(dt);
+                render();
+                requestAnimationFrame(gameLoop);
+            }
+            restartBtn.addEventListener('click', resetGame);
+            speedBtn.addEventListener('click', () => {
+                if (speedMultiplier === 1) { speedMultiplier = 2;
+                    speedBtn.textContent = '⏩ x2';
+                    speedBtn.classList.add('active'); } else if (speedMultiplier === 2) { speedMultiplier =
+                        4;
+                    speedBtn.textContent = '⏩ x4';
+                    speedBtn.classList.add('active'); } else { speedMultiplier = 1;
+                    speedBtn.textContent = '⏩ x1';
+                    speedBtn.classList.remove('active'); }
+            });
+            document.getElementById('addUA').addEventListener('click', () => { if (!gameOver) { for (let i = 0; i <
+                        5; i++) spawnSoldier('UA');
+                    updateScores(); } });
+            document.getElementById('addRU').addEventListener('click', () => { if (!gameOver) { for (let i = 0; i <
+                        5; i++) spawnSoldier('RU');
+                    updateScores(); } });
+            document.getElementById('airstrikeUA').addEventListener('click', () => { if (!gameOver) airstrike('UA'); });
+            document.getElementById('airstrikeRU').addEventListener('click', () => { if (!gameOver) airstrike('RU'); });
+            document.getElementById('nukeBtn').addEventListener('click', () => { if (!gameOver) tacticalNuke(); });
+            document.getElementById('smokeBtn').addEventListener('click', () => { if (!gameOver) smokeScreen(); });
+            resetGame();
+            console.log('%c ROCKET %c Симулятор Битвы v3.0 %c Активирован ',
+                'background:#f00;color:#fff;padding:6px;font-size:16px;',
+                'background:#333;color:#ff0;padding:6px;',
+                'background:#080810;color:#0f0;padding:6px;');
+            requestAnimationFrame(gameLoop);
+        })();
+    </script>
+</body>
+</html>
